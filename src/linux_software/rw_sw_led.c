@@ -7,7 +7,8 @@
 #define GPIO_DIP_OFFSET 2 //sw(3:0)
 #define GPIO_LED_OFFSET 0 //led (3:0)
 #define GPIO_RGB_OFFSET 1 //rgb led (6 bits led5 + led5)
-#define DIPS_AND_LEDS_BASEADDR 0x41200000
+#define DIPS_AND_LEDS_BASEADDR	0x41200000
+#define RGB_BASEADDR		0x41210000
 
 
 // the below code uses a device called /dev/mem to get a pointer to a physical
@@ -27,23 +28,31 @@ int main()
 
 // first, get a pointer to the peripheral base address using /dev/mem and the function mmap
 
-    volatile unsigned int *rgb_led= get_a_pointer(DIPS_AND_LEDS_BASEADDR);
+    volatile unsigned int *dips_leds= get_a_pointer(DIPS_AND_LEDS_BASEADDR);
+    volatile unsigned int *rgb_led= get_a_pointer(RGB_BASEADDR);
+
+ if (!dips_leds || !rgb_led) {
+        printf("Failed to map memory.\n");
+        return 1;
+    }
+
     printf("\nTask 4: RGB + LED control w/ switches\n");
     unsigned int counter = 0;
     
 while (1)
     {
-  	    unsigned int sw_all = *(rgb_led + GPIO_DIP_OFFSET) & 0xF7; //read only sw(2:0)
-            unsigned int rgb_code = sw_all & 0x7;
+  	    unsigned int sw_all = *(dips_leds + GPIO_DIP_OFFSET) & 0x7; //read only sw(2:0)
+	    unsigned int rgb_code = sw_all & 0xF; 			// SW[2:0] for color
+           
             usleep(500000); 
 	  
-	   *(rgb_led + GPIO_RGB_OFFSET) = rgb_code;		//set rgb leds 
-	   *(rgb_led + GPIO_LED_OFFSET) = counter & 0xF; 	//set led(3:0)
+	   *(dips_leds + GPIO_LED_OFFSET) = counter & 0xF;		//set rgb leds 
+	   *(rgb_led + 0) =  rgb_code | (rgb_code << 3);	//set led(3:0)
 	  
 	   counter++;
 	   usleep(500000); //500ms delay 
 	    // for demonstration purposes, print the value of the DIPS
-	    printf("Current Switches = %d\r\n",*(sw_all + GPIO_DIP_OFFSET));
+	  printf("SW[3:0]=0x%X | RGB code=0x%X | LED count=0x%X\n", sw_all, rgb_code, counter & 0xF);
     }
    return 0;
 }
